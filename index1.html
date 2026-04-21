@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Timer</title>
+
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  #timer {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    font-size: 100px;
+    font-weight: bold;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-shadow: 0 0 10px rgba(0,0,0,0.7);
+  }
+</style>
+</head>
+
+<body>
+
+<div id="timer">45</div>
+
+<script>
+function updateTimer() {
+  var now = new Date();
+  var seconds = now.getSeconds();
+
+  var cycle = seconds % 60;
+  var displayTime;
+
+  if (cycle < 45) {
+    displayTime = 45 - cycle;
+  } else {
+    displayTime = 60 - cycle;
+  }
+
+  document.getElementById("timer").innerText = displayTime;
+}
+
+// Run immediately
+updateTimer();
+
+// Update every second
+setInterval(updateTimer, 1000);
+</script>
+
+</body>
+</html>
