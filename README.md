@@ -1,2 +1,0 @@
-# gym-timer
-gym timer
