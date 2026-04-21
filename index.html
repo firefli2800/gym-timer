@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Overlay Timer</title>
+
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  #timer {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    font-size: 100px;
+    font-weight: bold;
+    color: white;
+    font-family: Arial, Helvetica, sans-serif;
+    text-shadow: 0 0 8px rgba(0,0,0,0.8);
+  }
+</style>
+</head>
+
+<body>
+
+<div id="timer">45</div>
+
+<script>
+function getTimeLeft() {
+  const now = new Date();
+
+  // seconds within minute (0–59)
+  const sec = now.getSeconds();
+
+  // 45 work / 15 rest cycle
+  let timeLeft;
+
+  if (sec < 45) {
+    timeLeft = 45 - sec;
+  } else {
+    timeLeft = 60 - sec;
+  }
+
+  return timeLeft;
+}
+
+function update() {
+  const el = document.getElementById("timer");
+  el.textContent = getTimeLeft();
+}
+
+// update immediately
+update();
+
+// update every second (aligned better)
+setInterval(update, 1000);
+</script>
+
+</body>
+</html>
