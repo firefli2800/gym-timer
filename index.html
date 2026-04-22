@@ -1,218 +1,304 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Gym Sync System</title>
+  <meta charset="UTF-8" />
+  <title>Gym Sync System</title>
 
-<style>
-body {
-  margin: 0;
-  background: black;
-  color: white;
-  font-family: Arial;
-}
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: white;
+    }
 
-#video {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  object-fit: cover;
-}
+    #video {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      background: black;
+    }
 
-#timer {
-  position: absolute;
-  top: 20px;
-  right: 30px;
-  font-size: 80px;
-  text-shadow: 0 0 10px black;
-}
+    #timer {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      font-size: 80px;
+      font-weight: bold;
+      text-shadow: 0 0 10px rgba(0,0,0,0.9);
+      z-index: 10;
+      user-select: none;
+    }
 
-#round {
-  position: absolute;
-  top: 110px;
-  right: 30px;
-  font-size: 40px;
-}
+    #round {
+      position: absolute;
+      top: 110px;
+      right: 30px;
+      font-size: 40px;
+      text-shadow: 0 0 10px rgba(0,0,0,0.9);
+      z-index: 10;
+      user-select: none;
+    }
 
-#controls {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  display: none;
-}
-</style>
+    #controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: none;
+      z-index: 20;
+      gap: 8px;
+    }
+
+    #controls button {
+      font-size: 16px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    #status {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      font-size: 16px;
+      text-shadow: 0 0 10px rgba(0,0,0,0.9);
+      z-index: 10;
+      user-select: none;
+    }
+  </style>
 </head>
 
 <body>
+  <div id="controls">
+    <button onclick="startSession()">START</button>
+    <button onclick="stopSession()">STOP</button>
+    <button onclick="resetSession()">RESET</button>
+    <button onclick="nextSegment()">NEXT</button>
+  </div>
 
-<div id="controls">
-  <button onclick="startSession()">START</button>
-  <button onclick="stopSession()">STOP</button>
-  <button onclick="resetSession()">RESET</button>
-  <button onclick="nextSegment()">NEXT</button>
-</div>
+  <video id="video" muted playsinline loop autoplay></video>
 
-<video id="video" muted loop autoplay></video>
+  <div id="timer">45</div>
+  <div id="round">Round 1</div>
+  <div id="status">Loading...</div>
 
-<div id="timer">45</div>
-<div id="round">Round 1</div>
+  <!-- Firebase v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script>
+    console.log("APP STARTED");
 
-<script>
+    // URL PARAMS
+    const params = new URLSearchParams(window.location.search);
+    const isController = params.get("controller") === "true";
+    const screen = params.get("screen") || "1";
 
-console.log("APP STARTED");
+    const controlsEl = document.getElementById("controls");
+    const timerEl = document.getElementById("timer");
+    const roundEl = document.getElementById("round");
+    const statusEl = document.getElementById("status");
+    const video = document.getElementById("video");
 
-// 🔑 URL PARAMETERS
-const params = new URLSearchParams(window.location.search);
-const isController = params.get("controller") === "true";
-const screen = params.get("screen") || "1";
+    if (isController) {
+      controlsEl.style.display = "flex";
+      statusEl.innerText = "Controller mode";
+    } else {
+      statusEl.innerText = "Display mode - Screen " + screen;
+    }
 
-// Show controls only on controller
-if (isController) {
-  document.getElementById("controls").style.display = "block";
-  console.log("Controller mode");
-} else {
-  console.log("Display mode - Screen:", screen);
-}
+    // FIREBASE CONFIG
+    const firebaseConfig = {
+      apiKey: "AIzaSyCamPqjcUH0H4h_n09WX5MYIBUZTOMDpjE",
+      authDomain: "gym-sync-c2a06.firebaseapp.com",
+      databaseURL: "https://gym-sync-c2a06-default-rtdb.firebaseio.com",
+      projectId: "gym-sync-c2a06",
+      storageBucket: "gym-sync-c2a06.firebasestorage.app",
+      messagingSenderId: "803350986935",
+      appId: "1:803350986935:web:1a51d276728d48f3c68d32"
+    };
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCamPqjcUH0H4h_n09WX5MYIBUZTOMDpjE",
-  authDomain: "gym-sync-c2a06.firebaseapp.com",
-  databaseURL: "https://gym-sync-c2a06-default-rtdb.firebaseio.com",
-  projectId: "gym-sync-c2a06",
-  storageBucket: "gym-sync-c2a06.firebasestorage.app",
-  messagingSenderId: "803350986935",
-  appId: "1:803350986935:web:1a51d276728d48f3c68d32"
-};
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+    let intervalId = null;
+    let currentVideoUrl = "";
 
-const video = document.getElementById("video");
-let interval = null;
+    // LOAD VIDEO URL FOR THIS SCREEN
+    db.ref("workout").on("value", (snapshot) => {
+      const workout = snapshot.val();
+      console.log("WORKOUT UPDATE:", workout);
 
-// 🎥 LOAD VIDEO BASED ON SCREEN
-db.ref("workout").on("value", snapshot => {
-  const workout = snapshot.val();
-  if (!workout) return;
+      if (!workout) {
+        statusEl.innerText = "No workout data found";
+        return;
+      }
 
-  const videoURL = workout[screen];
+      const videoURL = workout[screen];
 
-  if (videoURL) {
-    console.log("Loading video:", videoURL);
-    video.src = videoURL;
-  }
-});
+      if (!videoURL) {
+        statusEl.innerText = "No video assigned for screen " + screen;
+        return;
+      }
 
-// 🟢 START
-function startSession() {
-  if (!isController) return;
-
-  db.ref("session").set({
-    startTime: Date.now(),
-    status: "running",
-    offset: 0
-  });
-}
-
-// ⛔ STOP
-function stopSession() {
-  if (!isController) return;
-
-  db.ref("session").once("value").then(snapshot => {
-    const data = snapshot.val();
-    if (!data) return;
-
-    const elapsed = Date.now() - data.startTime + data.offset;
-
-    db.ref("session").update({
-      status: "paused",
-      offset: elapsed
+      if (videoURL !== currentVideoUrl) {
+        currentVideoUrl = videoURL;
+        console.log("Loading video for screen", screen, ":", currentVideoUrl);
+        video.src = currentVideoUrl;
+        video.load();
+        statusEl.innerText = "Loaded video for screen " + screen;
+      }
     });
-  });
-}
 
-// 🔁 RESET
-function resetSession() {
-  if (!isController) return;
+    // CONTROLLER ACTIONS
+    function startSession() {
+      if (!isController) return;
 
-  db.ref("session").set({
-    startTime: 0,
-    status: "stopped",
-    offset: 0
-  });
+      db.ref("session").set({
+        startTime: Date.now(),
+        status: "running",
+        offset: 0
+      });
+    }
 
-  video.pause();
-  video.currentTime = 0;
-  document.getElementById("timer").innerText = "45";
-  document.getElementById("round").innerText = "Round 1";
-}
+    function stopSession() {
+      if (!isController) return;
 
-// ⏭️ NEXT
-function nextSegment() {
-  if (!isController) return;
+      db.ref("session").once("value").then((snapshot) => {
+        const data = snapshot.val();
+        if (!data || data.status !== "running") return;
 
-  db.ref("session").once("value").then(snapshot => {
-    const data = snapshot.val();
-    if (!data) return;
+        const elapsedMs = Date.now() - data.startTime + (data.offset || 0);
 
-    db.ref("session").update({
-      offset: data.offset + 60
+        db.ref("session").update({
+          status: "paused",
+          offset: elapsedMs
+        });
+      });
+    }
+
+    function resetSession() {
+      if (!isController) return;
+
+      db.ref("session").set({
+        startTime: 0,
+        status: "stopped",
+        offset: 0
+      });
+    }
+
+    function nextSegment() {
+      if (!isController) return;
+
+      db.ref("session").once("value").then((snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        const currentOffset = data.offset || 0;
+        const newOffset = currentOffset + 60 * 1000; // jump 60 seconds
+
+        if (data.status === "running") {
+          db.ref("session").update({
+            startTime: Date.now(),
+            offset: newOffset
+          });
+        } else {
+          db.ref("session").update({
+            offset: newOffset
+          });
+        }
+      });
+    }
+
+    // LISTEN FOR SESSION CHANGES
+    db.ref("session").on("value", (snapshot) => {
+      const data = snapshot.val();
+      console.log("SESSION UPDATE:", data);
+
+      if (!data) {
+        statusEl.innerText = "No session data found";
+        return;
+      }
+
+      clearRunningLoop();
+
+      if (data.status === "running") {
+        runSession(data.startTime, data.offset || 0);
+      } else if (data.status === "paused") {
+        video.pause();
+        statusEl.innerText = isController ? "Paused (controller)" : "Paused";
+      } else {
+        video.pause();
+        try {
+          video.currentTime = 0;
+        } catch (e) {
+          console.warn("Could not reset video currentTime:", e);
+        }
+        timerEl.innerText = "45";
+        roundEl.innerText = "Round 1";
+        statusEl.innerText = isController ? "Stopped (controller)" : "Stopped";
+      }
     });
-  });
-}
 
-// 🔵 LISTENER
-db.ref("session").on("value", snapshot => {
-  const data = snapshot.val();
-  if (!data) return;
+    function clearRunningLoop() {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    }
 
-  if (interval) clearInterval(interval);
+    function runSession(startTime, offsetMs) {
+      function update() {
+        const now = Date.now();
+        const elapsedSeconds = Math.floor((now - startTime + offsetMs) / 1000);
 
-  if (data.status === "running") {
-    runSession(data.startTime, data.offset);
-  } else {
-    video.pause();
-  }
-});
+        // sync video
+        if (!video.paused) {
+          // keep going
+        } else {
+          video.play().catch((err) => {
+            console.warn("Autoplay blocked or failed:", err);
+          });
+        }
 
-// 🎯 MAIN LOOP
-function runSession(startTime, offset) {
+        // only seek if noticeably off
+        const desiredTime = Math.max(0, elapsedSeconds);
+        if (Math.abs(video.currentTime - desiredTime) > 1.0) {
+          try {
+            video.currentTime = desiredTime;
+          } catch (e) {
+            console.warn("Could not seek video:", e);
+          }
+        }
 
-  interval = setInterval(() => {
+        // 45 work / 15 transition
+        const cycle = elapsedSeconds % 60;
+        const timeLeft = cycle < 45 ? 45 - cycle : 60 - cycle;
+        timerEl.innerText = String(timeLeft);
 
-    const now = Date.now();
-    const elapsed = Math.floor((now - startTime + offset) / 1000);
+        // round display: 6 min per round, max 3
+        const roundNumber = Math.floor(elapsedSeconds / 360) + 1;
+        roundEl.innerText = "Round " + String(Math.min(roundNumber, 3));
 
-    // Sync video
-    video.currentTime = elapsed;
-    video.play();
+        statusEl.innerText = isController
+          ? "Running (controller) - Screen " + screen
+          : "Running - Screen " + screen;
+      }
 
-    // Timer
-    const cycle = elapsed % 60;
-    let timeLeft = cycle < 45 ? 45 - cycle : 60 - cycle;
-    document.getElementById("timer").innerText = timeLeft;
+      update();
+      intervalId = setInterval(update, 500);
+    }
 
-    // Round (6 min each, max 3)
-    const round = Math.floor(elapsed / 360) + 1;
-    const displayRound = Math.min(round, 3);
-    document.getElementById("round").innerText = "Round " + displayRound;
-
-  }, 500);
-}
-
-// 🔁 AUTO RELOAD EVERY 12 HOURS
-setInterval(() => {
-  console.log("Auto reload triggered");
-  location.reload();
-}, 43200000);
-
-</script>
-
+    // AUTO RELOAD EVERY 12 HOURS
+    setInterval(() => {
+      console.log("Auto reload triggered");
+      location.reload();
+    }, 43200000);
+  </script>
 </body>
 </html>
