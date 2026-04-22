@@ -2,55 +2,214 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Timer</title>
+<title>Gym Sync</title>
 
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: transparent;
-    overflow: hidden;
-  }
+body {
+  margin: 0;
+  background: black;
+  color: white;
+  font-family: Arial;
+}
 
-  #timer {
-    position: absolute;
-    top: 20px;
-    right: 30px;
-    font-size: 100px;
-    font-weight: bold;
-    color: white;
-    font-family: Arial, sans-serif;
-    text-shadow: 0 0 10px rgba(0,0,0,0.7);
-  }
+#video {
+  width: 100%;
+}
+
+#timer {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  font-size: 80px;
+  text-shadow: 0 0 10px black;
+}
+
+#round {
+  position: absolute;
+  top: 110px;
+  right: 30px;
+  font-size: 40px;
+}
+
+#controls {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: none;
+}
 </style>
 </head>
 
 <body>
 
+<div id="controls">
+  <button onclick="startSession()">START</button>
+  <button onclick="stopSession()">STOP</button>
+  <button onclick="resetSession()">RESET</button>
+  <button onclick="nextSegment()">NEXT</button>
+</div>
+
+<video id="video" muted loop>
+  <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+</video>
+
 <div id="timer">45</div>
+<div id="round">Round 1</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
-function updateTimer() {
-  var now = new Date();
-  var seconds = now.getSeconds();
 
-  var cycle = seconds % 60;
-  var displayTime;
+console.log("APP STARTED");
 
-  if (cycle < 45) {
-    displayTime = 45 - cycle;
-  } else {
-    displayTime = 60 - cycle;
-  }
+// 🔑 Detect controller mode from URL
+const params = new URLSearchParams(window.location.search);
+const isController = params.get("controller") === "true";
 
-  document.getElementById("timer").innerText = displayTime;
+// Show controls only if controller
+if (isController) {
+  document.getElementById("controls").style.display = "block";
+  console.log("Controller mode ON");
+} else {
+  console.log("Display mode (TV)");
 }
 
-// Run immediately
-updateTimer();
+// 🔴 Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyCamPqjcUH0H4h_n09WX5MYIBUZTOMDpjE",
+  authDomain: "gym-sync-c2a06.firebaseapp.com",
+  databaseURL: "https://gym-sync-c2a06-default-rtdb.firebaseio.com",
+  projectId: "gym-sync-c2a06",
+  storageBucket: "gym-sync-c2a06.firebasestorage.app",
+  messagingSenderId: "803350986935",
+  appId: "1:803350986935:web:1a51d276728d48f3c68d32"
+};
 
-// Update every second
-setInterval(updateTimer, 1000);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const video = document.getElementById("video");
+
+let interval = null;
+
+// 🟢 START
+function startSession() {
+  if (!isController) return;
+
+  console.log("START pressed");
+
+  db.ref("session").set({
+    startTime: Date.now(),
+    status: "running",
+    offset: 0
+  });
+}
+
+// ⛔ STOP
+function stopSession() {
+  if (!isController) return;
+
+  console.log("STOP pressed");
+
+  db.ref("session").once("value").then(snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    const elapsed = Date.now() - data.startTime + data.offset;
+
+    db.ref("session").update({
+      status: "paused",
+      offset: elapsed
+    });
+  });
+}
+
+// 🔁 RESET
+function resetSession() {
+  if (!isController) return;
+
+  console.log("RESET pressed");
+
+  db.ref("session").set({
+    startTime: 0,
+    status: "stopped",
+    offset: 0
+  });
+
+  video.pause();
+  video.currentTime = 0;
+  document.getElementById("timer").innerText = "45";
+  document.getElementById("round").innerText = "Round 1";
+}
+
+// ⏭️ NEXT
+function nextSegment() {
+  if (!isController) return;
+
+  console.log("NEXT pressed");
+
+  db.ref("session").once("value").then(snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    db.ref("session").update({
+      offset: data.offset + 60
+    });
+  });
+}
+
+// 🔵 LISTENER (ALL SCREENS)
+db.ref("session").on("value", snapshot => {
+  const data = snapshot.val();
+
+  console.log("SESSION UPDATE:", data);
+
+  if (!data) return;
+
+  if (interval) clearInterval(interval);
+
+  if (data.status === "running") {
+    runSession(data.startTime, data.offset);
+  } else {
+    video.pause();
+  }
+});
+
+// 🎯 MAIN LOOP
+function runSession(startTime, offset) {
+
+  interval = setInterval(() => {
+
+    const now = Date.now();
+    const elapsed = Math.floor((now - startTime + offset) / 1000);
+
+    // 🎥 VIDEO SYNC
+    video.currentTime = elapsed;
+    video.play();
+
+    // ⏱ TIMER
+    const cycle = elapsed % 60;
+
+    let timeLeft;
+    if (cycle < 45) {
+      timeLeft = 45 - cycle;
+    } else {
+      timeLeft = 60 - cycle;
+    }
+
+    document.getElementById("timer").innerText = timeLeft;
+
+    // 🔢 ROUND DISPLAY (6 min rounds, max 3)
+    const round = Math.floor(elapsed / 360) + 1;
+    const displayRound = Math.min(round, 3);
+
+    document.getElementById("round").innerText = "Round " + displayRound;
+
+  }, 500);
+}
+
 </script>
 
 </body>
