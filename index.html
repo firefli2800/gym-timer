@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Gym Sync</title>
+<title>Gym Sync System</title>
 
 <style>
 body {
@@ -13,7 +13,12 @@ body {
 }
 
 #video {
-  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
 }
 
 #timer {
@@ -49,9 +54,7 @@ body {
   <button onclick="nextSegment()">NEXT</button>
 </div>
 
-<video id="video" muted loop>
-  <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
-</video>
+<video id="video" muted loop autoplay></video>
 
 <div id="timer">45</div>
 <div id="round">Round 1</div>
@@ -64,41 +67,52 @@ body {
 
 console.log("APP STARTED");
 
-// 🔑 Detect controller mode from URL
+// 🔑 URL PARAMETERS
 const params = new URLSearchParams(window.location.search);
 const isController = params.get("controller") === "true";
+const screen = params.get("screen") || "1";
 
-// Show controls only if controller
+// Show controls only on controller
 if (isController) {
   document.getElementById("controls").style.display = "block";
-  console.log("Controller mode ON");
+  console.log("Controller mode");
 } else {
-  console.log("Display mode (TV)");
+  console.log("Display mode - Screen:", screen);
 }
 
-// 🔴 Firebase config
+// 🔴 FIREBASE CONFIG
 const firebaseConfig = {
-  apiKey: "AIzaSyCamPqjcUH0H4h_n09WX5MYIBUZTOMDpjE",
-  authDomain: "gym-sync-c2a06.firebaseapp.com",
-  databaseURL: "https://gym-sync-c2a06-default-rtdb.firebaseio.com",
-  projectId: "gym-sync-c2a06",
-  storageBucket: "gym-sync-c2a06.firebasestorage.app",
-  messagingSenderId: "803350986935",
-  appId: "1:803350986935:web:1a51d276728d48f3c68d32"
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  databaseURL: "YOUR_DB_URL",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_BUCKET",
+  messagingSenderId: "YOUR_ID",
+  appId: "YOUR_APP"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 const video = document.getElementById("video");
-
 let interval = null;
+
+// 🎥 LOAD VIDEO BASED ON SCREEN
+db.ref("workout").on("value", snapshot => {
+  const workout = snapshot.val();
+  if (!workout) return;
+
+  const videoURL = workout[screen];
+
+  if (videoURL) {
+    console.log("Loading video:", videoURL);
+    video.src = videoURL;
+  }
+});
 
 // 🟢 START
 function startSession() {
   if (!isController) return;
-
-  console.log("START pressed");
 
   db.ref("session").set({
     startTime: Date.now(),
@@ -110,8 +124,6 @@ function startSession() {
 // ⛔ STOP
 function stopSession() {
   if (!isController) return;
-
-  console.log("STOP pressed");
 
   db.ref("session").once("value").then(snapshot => {
     const data = snapshot.val();
@@ -130,8 +142,6 @@ function stopSession() {
 function resetSession() {
   if (!isController) return;
 
-  console.log("RESET pressed");
-
   db.ref("session").set({
     startTime: 0,
     status: "stopped",
@@ -148,8 +158,6 @@ function resetSession() {
 function nextSegment() {
   if (!isController) return;
 
-  console.log("NEXT pressed");
-
   db.ref("session").once("value").then(snapshot => {
     const data = snapshot.val();
     if (!data) return;
@@ -160,12 +168,9 @@ function nextSegment() {
   });
 }
 
-// 🔵 LISTENER (ALL SCREENS)
+// 🔵 LISTENER
 db.ref("session").on("value", snapshot => {
   const data = snapshot.val();
-
-  console.log("SESSION UPDATE:", data);
-
   if (!data) return;
 
   if (interval) clearInterval(interval);
@@ -185,30 +190,28 @@ function runSession(startTime, offset) {
     const now = Date.now();
     const elapsed = Math.floor((now - startTime + offset) / 1000);
 
-    // 🎥 VIDEO SYNC
+    // Sync video
     video.currentTime = elapsed;
     video.play();
 
-    // ⏱ TIMER
+    // Timer
     const cycle = elapsed % 60;
-
-    let timeLeft;
-    if (cycle < 45) {
-      timeLeft = 45 - cycle;
-    } else {
-      timeLeft = 60 - cycle;
-    }
-
+    let timeLeft = cycle < 45 ? 45 - cycle : 60 - cycle;
     document.getElementById("timer").innerText = timeLeft;
 
-    // 🔢 ROUND DISPLAY (6 min rounds, max 3)
+    // Round (6 min each, max 3)
     const round = Math.floor(elapsed / 360) + 1;
     const displayRound = Math.min(round, 3);
-
     document.getElementById("round").innerText = "Round " + displayRound;
 
   }, 500);
 }
+
+// 🔁 AUTO RELOAD EVERY 12 HOURS
+setInterval(() => {
+  console.log("Auto reload triggered");
+  location.reload();
+}, 43200000);
 
 </script>
 
