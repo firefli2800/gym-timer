@@ -130,31 +130,38 @@
     let currentVideoUrl = "";
 
     // LOAD VIDEO URL FOR THIS SCREEN
-    db.ref("workout").on("value", (snapshot) => {
-      const workout = snapshot.val();
-      console.log("WORKOUT UPDATE:", workout);
+db.ref("workout").on("value", (snapshot) => {
+  const workout = snapshot.val();
+  console.log("WORKOUT UPDATE:", workout);
 
-      if (!workout) {
-        statusEl.innerText = "No workout data found";
-        return;
-      }
+  if (!workout) {
+    statusEl.innerText = "No workout data found";
+    return;
+  }
 
-      const videoURL = workout[screen];
+  const videoURL = workout[screen];
 
-      if (!videoURL) {
-        statusEl.innerText = "No video assigned for screen " + screen;
-        return;
-      }
+  if (!videoURL) {
+    statusEl.innerText = "No video assigned for screen " + screen;
+    return;
+  }
 
-      if (videoURL !== currentVideoUrl) {
-        currentVideoUrl = videoURL;
-        console.log("Loading video for screen", screen, ":", currentVideoUrl);
-        video.src = currentVideoUrl;
-        video.load();
-        statusEl.innerText = "Loaded video for screen " + screen;
-      }
+  if (videoURL !== currentVideoUrl) {
+    currentVideoUrl = videoURL;
+
+    console.log("Loading video for screen", screen, ":", currentVideoUrl);
+
+    video.pause();          // stop old video
+    video.src = currentVideoUrl;
+    video.load();           // reload
+
+    video.play().catch(err => {
+      console.log("Autoplay failed:", err);
     });
 
+    statusEl.innerText = "Loaded video for screen " + screen;
+  }
+});
     // CONTROLLER ACTIONS
     function startSession() {
       if (!isController) return;
